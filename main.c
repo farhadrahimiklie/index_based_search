@@ -1,85 +1,114 @@
 #include <stdio.h>
 #include <string.h>
 
+// Students Structure
 typedef struct {
     int id;
     char name[32];
     float score;
+    char deleted; // 0 active 1 delete
 }Student;
 
+// Index for Search the student structrue
 typedef struct {
     int id;
     long offset;
-}IndexEntry;
+}Index;
 
-void insert_student(int id, char name[], float score){
-    FILE* data = fopen("data.bin", "ab");
-    FILE* index = fopen("index.bin", "ab");
-
+void Insert_data(int id, const char* name, float score){
+    FILE *data = fopen("data.bin", "ab");
+    FILE *index = fopen("index.bin", "ab");
     if(data == NULL && index == NULL){
-        perror("Cannot open file for append data");
+        perror("Cannot open for append data inside files. ");
         return;
     }
+    Student student;
+    Index indexEntry;
 
-    Student s;
-    IndexEntry ie;
+    student.id = id;
+    strcpy(student.name, name);
+    student.score = score;
 
-    s.id = id;
-    strcpy(s.name, name);
-    s.score = score;
+    indexEntry.id = id;
+    indexEntry.offset = ftell(data);
 
-    ie.id = id;
-    ie.offset = ftell(data);
-
-    fwrite(&s, sizeof(s), 1, data);
-    fwrite(&ie, sizeof(ie), 1, index);
-
+    fwrite(&student, sizeof(student), 1, data);
+    fwrite(&indexEntry, sizeof(indexEntry), 1, index);
     fclose(data);
     fclose(index);
 }
 
-int update_score(int id, float new_score){
+int update_student(int id, const char* new_name){
+    FILE *data = fopen("data.bin", "rb+");
+    FILE *index = fopen("index.bin", "rb+");
+    
+    if(data == NULL && index == NULL){
+        perror("Cannot open for reading data inside files. ");
+        return 1;
+    }
+    Student student;
+    Index Entry;
+
+    while(fread(&Entry, sizeof(Entry), 1, index) == 1){
+        if(Entry.id == id){
+            fseek(data, Entry.offset, SEEK_SET);
+            fread(&student, sizeof(student), 1, data);
+            strcpy(student.name, new_name);
+            fseek(data, Entry.offset, SEEK_SET);
+            fwrite(&student, sizeof(student), 1, data);
+
+            fclose(data);
+            fclose(index);
+            return 1;
+        }
+    }
+    fclose(data);
+    fclose(index);
+    return 0;
+}
+
+int delete_student(int id) {
     FILE *data = fopen("data.bin", "rb+");
     FILE *index = fopen("index.bin", "rb");
 
-    IndexEntry ie;
+    Index ie;
     Student s;
 
-    while(fread(&ie, sizeof(ie), 1, index) == 1){
-        if(ie.id == id){
-            fseek(data, ie.offset, SEEK_SET);
-            fread(&s, sizeof(s), 1, data);
+    while (fread(&ie, sizeof(ie), 1, index) == 1) {
+       if (ie.id == id) {
+          fseek(data, ie.offset, SEEK_SET);
+          fread(&s, sizeof(s), 1, data);
 
-            s.score = new_score;
+          s.deleted = 1;
 
-            fseek(data, ie.offset, SEEK_SET);
-            fwrite(&s, sizeof(s), 1, data);
+          fseek(data, ie.offset, SEEK_SET);
+          fwrite(&s, sizeof(s), 1, data);
 
-            fclose(data);
-            fclose(index);
-            return 1;
-        }
-    }
-    fclose(index);
-    fclose(data);
-    return 0;
+          fclose(data);
+          fclose(index);
+          return 1;                              
+      }
+     }
+
+         fclose(data);
+         fclose(index);
+         return 0;
 }
 
-int find_student(int id, Student* student_struct){
-    FILE* data = fopen("data.bin", "rb");
-    FILE* index = fopen("index.bin", "rb");
-
+int find_student(int id, Student *student){
+    FILE *data = fopen("data.bin", "rb");
+    FILE *index = fopen("index.bin", "rb");
+    
     if(data == NULL && index == NULL){
-        perror("Cannot open file for Reading data");
+        perror("Cannot open for reading data inside files. ");
         return 1;
     }
 
-    IndexEntry ie;
-
-    while(fread(&ie, sizeof(ie), 1, index) == 1){
-        if(ie.id == id){
-            fseek(data, ie.offset, SEEK_SET);
-            fread(student_struct, sizeof(*student_struct), 1, data);
+    Index Entry;
+    while(fread(&Entry, sizeof(Entry), 1, index) == 1){
+        if(Entry.id == id){
+            fseek(data, Entry.offset,SEEK_SET);
+            fread(student, sizeof(*student), 1, data);
             fclose(data);
             fclose(index);
             return 1;
@@ -90,25 +119,20 @@ int find_student(int id, Student* student_struct){
     return 0;
 }
 
-
 int main(){
+    Student student;
+    //Insert_data(1, "Farhad Rahimi Klie", 12.6);
+    //Insert_data(2, "Hashmatullah Ishan", 18.7);
+    //Insert_data(3, "Shaher Ishan", 14.6);
+    //Insert_data(4, "Nouman Aziz", 10.1);
+    //Insert_data(5, "Rustam Hayat", 2.65);
 
-    insert_student(1, "farhad klie", 4.78);
-    insert_student(2, "shaher ishan", 123.5);
-    insert_student(3, "janan", 12.7);
-    insert_student(4, "khalid", 98.5);
-    insert_student(5, "almas", 5.9);
+    delete_student(1);
 
-    Student student; // struct student is here.
-    if(find_student(3, &student)){
+    if(find_student(2, &student) && !student.deleted){
         printf("ID: %d, Name: %s, Score: %.2f \n", student.id, student.name, student.score);
     }
 
-    // update_score(3, 100.5);
-
-    // if(find_student(3, &student)){
-       // printf("Score Updated Successfully . %.2f \n", student.score);
-    //}
-
+    //update_student(1, "Farhad Rahimi Klie Khan");
     return 0;
 }
